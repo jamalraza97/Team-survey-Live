@@ -1,0 +1,8 @@
+{
+  "name": "team-peer-survey",
+  "version": "1.0.0",
+  "description": "Anonymous CATME peer evaluation survey for merchandising team",
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  }
+}

@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理员报告 — 团队协作评估</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'PingFang SC','Microsoft YaHei',sans-serif;background:#f5f6fa;color:#1a1a2e;min-height:100vh}
+
+  /* Login */
+  .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .login-card{background:#fff;border:1px solid #e8eaf0;border-radius:16px;padding:40px;width:100%;max-width:400px;text-align:center}
+  .login-icon{font-size:40px;margin-bottom:16px}
+  .login-title{font-size:22px;font-weight:700;color:#111827;margin-bottom:6px}
+  .login-sub{font-size:14px;color:#6b7280;margin-bottom:28px}
+  .login-input{width:100%;padding:12px 14px;border:1.5px solid #e8eaf0;border-radius:8px;font-size:15px;outline:none;font-family:inherit;transition:border .15s;margin-bottom:12px}
+  .login-input:focus{border-color:#93c5fd}
+  .login-btn{width:100%;padding:12px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit}
+  .login-btn:hover{background:#1d4ed8}
+  .login-err{font-size:13px;color:#dc2626;margin-top:8px;display:none}
+
+  /* Dashboard */
+  #dashboard{display:none}
+  .top-bar{background:#fff;border-bottom:1px solid #e8eaf0;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:100}
+  .top-logo{font-size:15px;font-weight:700;color:#111827}
+  .top-right{display:flex;gap:10px;align-items:center}
+  .stat-chip{font-size:12px;color:#6b7280;background:#f3f4f6;padding:4px 12px;border-radius:20px}
+  .export-btn{padding:7px 16px;border:1.5px solid #e8eaf0;border-radius:8px;background:#fff;font-size:13px;font-weight:500;cursor:pointer;color:#374151;font-family:inherit}
+  .export-btn:hover{border-color:#93c5fd;color:#1d4ed8}
+
+  .shell{max-width:900px;margin:0 auto;padding:24px 16px 60px}
+  .section-title{font-size:13px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.08em;margin-bottom:16px}
+
+  /* Overview strip */
+  .overview-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:28px}
+  .ov-card{background:#fff;border:1px solid #e8eaf0;border-radius:10px;padding:14px;text-align:center;cursor:pointer;transition:border .15s}
+  .ov-card:hover{border-color:#93c5fd}
+  .ov-card.active{border-color:#2563eb;box-shadow:0 0 0 3px #dbeafe}
+  .ov-avatar{width:36px;height:36px;border-radius:50%;background:#dbeafe;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#1d4ed8;margin:0 auto 8px}
+  .ov-name{font-size:13px;font-weight:600;color:#111827;margin-bottom:4px}
+  .ov-score{font-size:20px;font-weight:700}
+  .ov-label{font-size:10px;color:#9ca3af;margin-top:2px}
+
+  /* Report */
+  .report-card{background:#fff;border:1px solid #e8eaf0;border-radius:14px;padding:24px;margin-bottom:16px}
+  .report-header{display:flex;align-items:center;gap:14px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #f3f4f6}
+  .rep-avatar{width:50px;height:50px;border-radius:50%;background:#dbeafe;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#1d4ed8;flex-shrink:0}
+  .rep-name{font-size:19px;font-weight:700;color:#111827}
+  .rep-meta{font-size:12px;color:#9ca3af;margin-top:2px}
+  .overall-badge{margin-left:auto;text-align:right;flex-shrink:0}
+  .overall-num{font-size:28px;font-weight:700}
+  .overall-tag{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:500;margin-top:3px;display:inline-block}
+
+  /* Radar */
+  .chart-section{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;margin-bottom:24px}
+  .radar-wrap{position:relative;width:100%;max-width:280px;margin:0 auto}
+  .dim-scores{display:flex;flex-direction:column;gap:12px}
+  .dim-row{}
+  .dim-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
+  .dim-cn{font-size:13px;font-weight:600;color:#374151}
+  .dim-en{font-size:11px;color:#9ca3af}
+  .dim-val{font-size:15px;font-weight:700}
+  .bar-bg{height:6px;background:#f3f4f6;border-radius:3px;overflow:hidden;position:relative}
+  .bar-fill{height:100%;border-radius:3px;transition:width .6s ease}
+  .ideal-mark{position:absolute;right:20%;top:-3px;bottom:-3px;width:2px;background:#d1d5db}
+  .dim-interp{font-size:11px;color:#6b7280;margin-top:4px;line-height:1.45}
+
+  /* Benchmark legend */
+  .benchmark-note{font-size:11px;color:#9ca3af;margin-top:8px;padding:8px 12px;background:#f9fafb;border-radius:6px;border:1px solid #f3f4f6}
+
+  /* Suggestions */
+  .sug-section{margin-top:20px;padding-top:16px;border-top:1px solid #f3f4f6}
+  .sug-title{font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
+  .sug-item{font-size:13px;color:#374151;padding:8px 12px;background:#f8fafc;border-radius:6px;border-left:3px solid #93c5fd;margin-bottom:6px;line-height:1.5}
+  .sug-empty{font-size:13px;color:#9ca3af;font-style:italic}
+
+  /* Loading */
+  .loading{text-align:center;padding:60px;color:#9ca3af;font-size:15px}
+
+  @media(max-width:600px){
+    .chart-section{grid-template-columns:1fr}
+    .overview-grid{grid-template-columns:repeat(3,1fr)}
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-wrap" id="login-wrap">
+  <div class="login-card">
+    <div class="login-icon">🔐</div>
+    <div class="login-title">管理员登录</div>
+    <div class="login-sub">仅限团队管理者访问评估结果</div>
+    <input class="login-input" type="password" id="pwd" placeholder="请输入管理员密码" onkeydown="if(event.key==='Enter')doLogin()"/>
+    <button class="login-btn" onclick="doLogin()">登录查看报告</button>
+    <div class="login-err" id="login-err">密码错误，请重试</div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+  <div class="top-bar">
+    <div class="top-logo">📊 团队协作评估 — 管理员报告</div>
+    <div class="top-right">
+      <span class="stat-chip" id="resp-count">加载中...</span>
+      <button class="export-btn" onclick="exportCSV()">⬇ 导出 CSV</button>
+    </div>
+  </div>
+
+  <div class="shell">
+    <div id="content"><div class="loading">正在加载评估数据...</div></div>
+  </div>
+</div>
+
+<script>
+const MEMBERS = ['宋玉仪','周雪梅','郭星星','黄乔珍','吴超','曾淑娴'];
+const DIMS = [
+  {key:'contrib',    cn:'工作贡献', en:'Work Contribution', ideal:4.5,
+   desc:{low:'任务完成质量与主动性有待提升，建议关注时间管理与工作流程优化。',
+         mid:'工作交付基本稳定，但在主动性和质量一致性方面仍有提升空间。',
+         high:'工作贡献突出，能主动高质量完成任务，是团队交付的可靠支柱。'}},
+  {key:'collab',    cn:'协作能力', en:'Collaboration', ideal:4.5,
+   desc:{low:'同事反映沟通与冲突处理方面存在明显挑战，这是当前最优先的改进方向。',
+         mid:'团队协作基本顺畅，但在处理分歧时的专业度上仍有成长空间。',
+         high:'沟通清晰、冲突处理成熟，是团队协作氛围的积极推动者。'}},
+  {key:'expertise', cn:'专业能力', en:'Expertise', ideal:4.0,
+   desc:{low:'同事认为在业务知识与决策质量方面存在差距，建议加强专业技能培养。',
+         mid:'专业知识达到基础要求，但决策的准确性和深度还有进一步提升的空间。',
+         high:'业务知识扎实，决策判断受到认可，是团队的专业参考人。'}},
+  {key:'reliability',cn:'可靠性',  en:'Reliability', ideal:4.5,
+   desc:{low:'承诺兑现率和进度透明度不足，影响了团队信任。提高可预期性是当前重点。',
+         mid:'总体可依赖，但偶有承诺落空或沟通不及时的情况，影响团队流畅度。',
+         high:'高度可信赖，说到做到并保持信息透明，是团队稳定性的重要基础。'}},
+  {key:'climate',   cn:'团队氛围', en:'Team Climate', ideal:4.0,
+   desc:{low:'同事感受到其对团队氛围有负面影响，开放性与情绪管理是最优先改进的领域。',
+         mid:'对团队氛围的贡献目前较为中性，更多的积极参与和开放态度会受到欢迎。',
+         high:'积极营造包容、尊重的团队文化，对团队凝聚力有重要的正向贡献。'}},
+];
+
+let globalData = null;
+let adminPwd = '';
+let activeIdx = 0;
+let charts = {};
+
+async function doLogin() {
+  const pwd = document.getElementById('pwd').value;
+  if (!pwd) return;
+  document.querySelector('.login-btn').textContent = '验证中...';
+  try {
+    const res = await fetch('/.netlify/functions/get-results', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({password: pwd})
+    });
+    if (res.status === 401) {
+      document.getElementById('login-err').style.display='block';
+      document.querySelector('.login-btn').textContent = '登录查看报告';
+      return;
+    }
+    if (!res.ok) throw new Error('server error');
+    globalData = await res.json();
+    adminPwd = pwd;
+    document.getElementById('login-wrap').style.display='none';
+    document.getElementById('dashboard').style.display='block';
+    renderDashboard();
+  } catch(e) {
+    alert('连接失败，请稍后重试。');
+    document.querySelector('.login-btn').textContent = '登录查看报告';
+  }
+}
+
+function scoreColor(s) {
+  if (s < 2.5) return '#dc2626';
+  if (s < 3.6) return '#d97706';
+  return '#059669';
+}
+function scoreBg(s) {
+  if (s < 2.5) return '#fee2e2';
+  if (s < 3.6) return '#fef3c7';
+  return '#d1fae5';
+}
+function scoreLabel(s) {
+  if (s < 2)   return '需立即关注';
+  if (s < 2.5) return '低于期望';
+  if (s < 3.6) return '达到基本期望';
+  if (s < 4.4) return '表现良好';
+  return '表现优秀';
+}
+function dimLabel(s) {
+  if (s < 2.5) return 'low';
+  if (s < 3.6) return 'mid';
+  return 'high';
+}
+function personAvg(person) {
+  const d = globalData.aggregated[person];
+  if (!d) return 0;
+  let sum=0, cnt=0;
+  DIMS.forEach(dim => {
+    const v = dimScore(person, dim.key);
+    if (v !== null) { sum+=v; cnt++; }
+  });
+  return cnt ? sum/cnt : 0;
+}
+function dimScore(person, dimKey) {
+  const d = globalData.aggregated[person];
+  if (!d) return null;
+  const q1 = d.scores[`${dimKey}_q1`];
+  const q2 = d.scores[`${dimKey}_q2`];
+  if (!q1?.length && !q2?.length) return null;
+  const all = [...(q1||[]), ...(q2||[])];
+  return all.reduce((a,b)=>a+b,0)/all.length;
+}
+function qAvg(scores) {
+  if(!scores||!scores.length) return null;
+  return scores.reduce((a,b)=>a+b,0)/scores.length;
+}
+
+function renderDashboard() {
+  const total = globalData.totalResponses;
+  document.getElementById('resp-count').textContent = `已收到 ${total} 份回复`;
+
+  const sorted = [...MEMBERS].sort((a,b) => personAvg(b)-personAvg(a));
+
+  let html = `<div class="section-title">团队概览 — 点击成员查看详细报告</div>
+  <div class="overview-grid">`;
+  sorted.forEach((m,i) => {
+    const avg = personAvg(m);
+    html += `<div class="ov-card ${i===0?'active':''}" id="ov-${m}" onclick="showReport('${m}')">
+      <div class="ov-avatar">${m[0]}</div>
+      <div class="ov-name">${m}</div>
+      <div class="ov-score" style="color:${scoreColor(avg)}">${avg.toFixed(1)}</div>
+      <div class="ov-label">${scoreLabel(avg)}</div>
+    </div>`;
+  });
+  html += `</div><div id="report-area"></div>`;
+  document.getElementById('content').innerHTML = html;
+  showReport(sorted[0]);
+}
+
+function showReport(member) {
+  document.querySelectorAll('.ov-card').forEach(c => c.classList.remove('active'));
+  const card = document.getElementById(`ov-${member}`);
+  if(card) card.classList.add('active');
+  activeIdx = MEMBERS.indexOf(member);
+
+  if(charts[member]) { charts[member].destroy(); delete charts[member]; }
+
+  const avg = personAvg(member);
+  const sugs = (globalData.aggregated[member]?.suggestions||[]).filter(s=>s&&s.trim());
+
+  const radarData = DIMS.map(d => {
+    const s = dimScore(member, d.key);
+    return s !== null ? +s.toFixed(2) : 0;
+  });
+  const idealData = DIMS.map(d => d.ideal);
+
+  let dimRowsHtml = '';
+  DIMS.forEach(d => {
+    const s = dimScore(member, d.key);
+    if(s===null){dimRowsHtml+=`<div class="dim-row"><div class="dim-top"><span class="dim-cn">${d.cn}</span><span class="dim-val" style="color:#9ca3af">暂无数据</span></div></div>`;return;}
+    const pct = (s/5)*100;
+    const idealPct = (d.ideal/5)*100;
+    const lbl = dimLabel(s);
+    dimRowsHtml += `<div class="dim-row">
+      <div class="dim-top">
+        <div><span class="dim-cn">${d.cn}</span> <span class="dim-en">${d.en}</span></div>
+        <span class="dim-val" style="color:${scoreColor(s)}">${s.toFixed(1)}</span>
+      </div>
+      <div class="bar-bg">
+        <div class="bar-fill" style="width:${pct}%;background:${scoreColor(s)}"></div>
+        <div class="ideal-mark" style="right:${100-idealPct}%" title="理想分 ${d.ideal}"></div>
+      </div>
+      <div class="dim-interp">${d.desc[lbl]}</div>
+    </div>`;
+  });
+
+  const sugHtml = sugs.length
+    ? sugs.map(s=>`<div class="sug-item">"${s}"</div>`).join('')
+    : `<div class="sug-empty">暂无同事填写改进建议</div>`;
+
+  document.getElementById('report-area').innerHTML = `
+  <div class="report-card">
+    <div class="report-header">
+      <div class="rep-avatar">${member[0]}</div>
+      <div>
+        <div class="rep-name">${member}</div>
+        <div class="rep-meta">匿名同伴评估 · ${globalData.totalResponses} 份回复 · 每维度2题均分</div>
+      </div>
+      <div class="overall-badge">
+        <div class="overall-num" style="color:${scoreColor(avg)}">${avg.toFixed(1)}<span style="font-size:14px;color:#9ca3af"> / 5</span></div>
+        <span class="overall-tag" style="background:${scoreBg(avg)};color:${scoreColor(avg)}">${scoreLabel(avg)}</span>
+      </div>
+    </div>
+
+    <div class="chart-section">
+      <div>
+        <div style="font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">五维度雷达图</div>
+        <div class="radar-wrap">
+          <canvas id="radar-${member}" role="img" aria-label="${member}的五维度评分雷达图" style="max-height:240px"></canvas>
+        </div>
+        <div class="benchmark-note">
+          🔵 实际得分 &nbsp;|&nbsp; ⬛ 竖线 = 各维度参考理想分 (4.0–4.5)<br>
+          建议目标：工作贡献 ≥ 4.5 · 协作能力 ≥ 4.5 · 专业能力 ≥ 4.0 · 可靠性 ≥ 4.5 · 团队氛围 ≥ 4.0
+        </div>
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">维度分项解读</div>
+        <div class="dim-scores">${dimRowsHtml}</div>
+      </div>
+    </div>
+
+    <div class="sug-section">
+      <div class="sug-title">📝 同事匿名改进建议</div>
+      ${sugHtml}
+    </div>
+  </div>`;
+
+  setTimeout(() => {
+    const ctx = document.getElementById(`radar-${member}`);
+    if(!ctx) return;
+    const isDark = matchMedia('(prefers-color-scheme:dark)').matches;
+    charts[member] = new Chart(ctx, {
+      type:'radar',
+      data:{
+        labels: DIMS.map(d=>d.cn),
+        datasets:[
+          {label:'实际得分', data:radarData,
+           backgroundColor:'rgba(37,99,235,0.12)', borderColor:'#2563eb',
+           borderWidth:2, pointBackgroundColor:'#2563eb', pointRadius:4, pointHoverRadius:6},
+          {label:'理想目标', data:idealData,
+           backgroundColor:'rgba(5,150,105,0.06)', borderColor:'#059669',
+           borderWidth:1.5, borderDash:[4,4], pointRadius:3,
+           pointBackgroundColor:'#059669', pointStyle:'rectRot'}
+        ]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:true,
+        plugins:{
+          legend:{display:true, position:'bottom',
+            labels:{font:{size:11}, boxWidth:12, padding:12, color:'#6b7280'}}
+        },
+        scales:{r:{
+          min:0, max:5,
+          ticks:{stepSize:1, color:'#9ca3af', font:{size:10}, backdropColor:'transparent'},
+          grid:{color:'rgba(0,0,0,.07)'},
+          angleLines:{color:'rgba(0,0,0,.05)'},
+          pointLabels:{color:'#374151', font:{size:11,weight:'500'}}
+        }}
+      }
+    });
+  }, 50);
+}
+
+function exportCSV() {
+  if(!globalData) return;
+  const rows = [['姓名','工作贡献','协作能力','专业能力','可靠性','团队氛围','综合均分','评估标签','改进建议数量']];
+  MEMBERS.forEach(m => {
+    const dims = DIMS.map(d => {
+      const s = dimScore(m, d.key);
+      return s !== null ? s.toFixed(2) : 'N/A';
+    });
+    const avg = personAvg(m);
+    const sugs = (globalData.aggregated[m]?.suggestions||[]).filter(s=>s&&s.trim()).length;
+    rows.push([m, ...dims, avg.toFixed(2), scoreLabel(avg), sugs]);
+  });
+  const csv = rows.map(r => r.map(v=>`"${v}"`).join(',')).join('\n');
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `团队评估报告_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+</script>
+</body>
+</html>
